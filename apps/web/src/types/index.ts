@@ -25,21 +25,7 @@ export interface HealthData {
   redis?: ComponentHealth | null;
 }
 
-export type DocumentProcessingStatus =
-  | "UPLOADED"
-  | "VALIDATING"
-  | "PROCESSING"
-  | "EXTRACTING"
-  | "OCR_REQUIRED"
-  | "OCR_PROCESSING"
-  | "EXTRACTED"
-  | "CLASSIFYING"
-  | "EXTRACTING_ENTITIES"
-  | "SEGMENTING_CLAUSES"
-  | "READY"
-  | "FAILED"
-  | "DELETING"
-  | "DELETED";
+export type _DocumentProcessingStatusLegacy = never; // replaced — see bottom of file
 
 export interface DocumentUploadData {
   document_id: string;
@@ -134,4 +120,47 @@ export interface DocumentClauseList {
   total_count: number;
   clauses: DocumentClauseItem[];
 }
+
+// ─── Phase 4: Semantic Retrieval ────────────────────────────────────────────
+
+export interface RetrievalResultItem {
+  chunk_id: string;
+  text: string;
+  score: number;
+  page_number: number;
+  page_id: string | null;
+  clause_id: string | null;
+  clause_number: string | null;
+  document_id: string;
+  retrieval_method: "semantic" | "lexical" | "hybrid";
+  source_type: string;
+}
+
+export interface RetrievalResponseData {
+  document_id: string;
+  query: string;
+  results: RetrievalResultItem[];
+  total_results: number;
+  retrieval_method: string;
+}
+
+/** Extend DocumentProcessingStatus with Phase 4 states */
+export type DocumentProcessingStatus =
+  | "UPLOADED"
+  | "VALIDATING"
+  | "PROCESSING"
+  | "EXTRACTING"
+  | "OCR_REQUIRED"
+  | "OCR_PROCESSING"
+  | "EXTRACTED"
+  | "CLASSIFYING"
+  | "EXTRACTING_ENTITIES"
+  | "SEGMENTING_CLAUSES"
+  | "CHUNKING_DOCUMENT"
+  | "GENERATING_EMBEDDINGS"
+  | "READY"
+  | "READY_WITHOUT_EMBEDDINGS"
+  | "FAILED"
+  | "DELETING"
+  | "DELETED";
 

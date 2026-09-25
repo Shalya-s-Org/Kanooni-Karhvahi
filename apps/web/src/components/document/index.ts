@@ -1,4 +1,6 @@
 /**
- * Document intake and PDF viewer components (Phase 2+).
+ * Document intake, PDF viewer, and retrieval components (Phase 2+).
  */
-export {};
+export { DocumentViewer } from "./DocumentViewer";
+export { FileUploadZone } from "./FileUploadZone";
+export { SemanticRetrievalPanel } from "./SemanticRetrievalPanel";

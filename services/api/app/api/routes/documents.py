@@ -524,3 +524,122 @@ async def get_specific_clause(
         )
     )
 
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Semantic Retrieval endpoint
+# ---------------------------------------------------------------------------
+from app.schemas.retrieval import RetrieveRequest, RetrievalResponseData, RetrievalResultSchema
+from app.rag.retrieval.service import document_retrieval_service
+from app.rag.embeddings.base import EmbeddingProviderError
+
+
+@router.post(
+    "/{document_id}/retrieve",
+    response_model=ApiResponse[RetrievalResponseData],
+    summary="Semantic Document Retrieval (Phase 4)",
+    description=(
+        "Retrieves the most semantically similar chunks from the specified document "
+        "for a given query using pgvector cosine similarity. "
+        "This endpoint returns evidence only — it does NOT generate an answer. "
+        "Every result includes full source traceability (page, clause, chunk). "
+        "Document isolation is enforced at SQL level: queries never cross document boundaries."
+    ),
+)
+async def retrieve_document_chunks(
+    document_id: uuid.UUID,
+    payload: RetrieveRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[RetrievalResponseData]:
+    """
+    POST /api/v1/documents/{document_id}/retrieve
+
+    Request::
+
+        {
+          "query": "What is the payment deadline?",
+          "top_k": 5
+        }
+
+    Response data::
+
+        {
+          "document_id": "...",
+          "query": "What is the payment deadline?",
+          "results": [
+            {
+              "chunk_id": "...",
+              "text": "...",
+              "score": 0.91,
+              "page_number": 4,
+              "clause_id": "...",
+              "clause_number": "3",
+              ...
+            }
+          ],
+          "total_results": 1,
+          "retrieval_method": "semantic"
+        }
+    """
+    try:
+        results = await document_retrieval_service.retrieve(
+            document_id=document_id,
+            query=payload.query,
+            top_k=payload.top_k,
+            db=db,
+        )
+
+        retrieval_method = results[0].retrieval_method if results else "semantic"
+
+        result_schemas = [
+            RetrievalResultSchema(
+                chunk_id=r.chunk_id,
+                text=r.text,
+                score=round(r.score, 6),
+                page_number=r.page_number,
+                page_id=r.page_id,
+                clause_id=r.clause_id,
+                clause_number=r.clause_number,
+                document_id=r.document_id,
+                retrieval_method=r.retrieval_method,
+                source_type=r.source_type,
+            )
+            for r in results
+        ]
+
+        return ApiResponse.ok(
+            data=RetrievalResponseData(
+                document_id=document_id,
+                query=payload.query,
+                results=result_schemas,
+                total_results=len(result_schemas),
+                retrieval_method=retrieval_method,
+            )
+        )
+
+    except EmbeddingProviderError as emb_err:
+        logger.warning("Retrieval failed — embedding provider unavailable: %s", emb_err)
+        return ApiResponse.fail(
+            code="EMBEDDING_PROVIDER_UNAVAILABLE",
+            message=(
+                "Semantic retrieval is unavailable because the embedding provider "
+                "is not configured.  Set EMBEDDING_PROVIDER=mock for development "
+                "or configure a real provider."
+            ),
+            retryable=False,
+        )
+
+    except ValueError as ve:
+        return ApiResponse.fail(
+            code="RETRIEVAL_ERROR",
+            message=str(ve),
+            retryable=False,
+        )
+
+    except Exception as e:
+        logger.error("Retrieval endpoint error for document %s: %s", document_id, e, exc_info=True)
+        return ApiResponse.fail(
+            code="RETRIEVAL_FAILED",
+            message="An unexpected error occurred during retrieval.",
+            retryable=True,
+        )

@@ -15,6 +15,9 @@ from app.document.extractor import DocumentExtractor
 from app.classification import classification_service
 from app.extraction import entity_extraction_service
 from app.clauses import clause_segmentation_service
+from app.rag.chunking import document_chunker
+from app.rag.embeddings.factory import get_embedding_provider
+from app.rag.embeddings.base import EmbeddingProviderError
 
 # Allowed MIME types and extensions
 ALLOWED_MIME_TYPES = {
@@ -32,10 +35,13 @@ STATUS_PROGRESS_MAP = {
     "OCR_REQUIRED": (45, "Scanned page detected, preparing OCR"),
     "OCR_PROCESSING": (55, "Performing optical character recognition"),
     "EXTRACTED": (65, "Finalizing page records"),
-    "CLASSIFYING": (75, "Classifying document type"),
-    "EXTRACTING_ENTITIES": (85, "Extracting action-relevant entities"),
-    "SEGMENTING_CLAUSES": (95, "Segmenting document clauses"),
+    "CLASSIFYING": (72, "Classifying document type"),
+    "EXTRACTING_ENTITIES": (79, "Extracting action-relevant entities"),
+    "SEGMENTING_CLAUSES": (86, "Segmenting document clauses"),
+    "CHUNKING_DOCUMENT": (91, "Building semantic chunks"),
+    "GENERATING_EMBEDDINGS": (96, "Generating vector embeddings"),
     "READY": (100, "Ready for comprehension and analysis"),
+    "READY_WITHOUT_EMBEDDINGS": (98, "Ready — embedding provider unavailable"),
     "FAILED": (0, "Processing encountered an issue"),
     "DELETING": (0, "Purging document data"),
     "DELETED": (0, "Document purged permanently"),
@@ -49,6 +55,57 @@ class DocumentValidationError(Exception):
         self.code = code
         self.message = message
         self.retryable = retryable
+
+
+async def _generate_and_store_embeddings(
+    document_id: uuid.UUID,
+    embedding_provider,
+    db: AsyncSession,
+) -> int:
+    """
+    Batch-generate embeddings for all chunks of *document_id* and persist them.
+
+    Uses the provider's embed_batch API so only one network round-trip is made
+    per batch of EMBEDDING_BATCH_SIZE chunks.  Returns the number of chunks
+    that received an embedding.
+
+    Security note: chunk text is never logged at INFO level or above.
+    """
+    from sqlalchemy import select, update
+    from app.models.document import DocumentChunk
+
+    # Load all chunks for the document that don't have an embedding yet.
+    result = await db.execute(
+        select(DocumentChunk)
+        .where(DocumentChunk.document_id == document_id)
+        .order_by(DocumentChunk.chunk_index)
+    )
+    chunks = list(result.scalars().all())
+
+    if not chunks:
+        logger.info("No chunks found for document %s — skipping embedding generation.", document_id)
+        return 0
+
+    batch_size = settings.EMBEDDING_BATCH_SIZE
+    total_embedded = 0
+
+    for batch_start in range(0, len(chunks), batch_size):
+        batch = chunks[batch_start : batch_start + batch_size]
+        texts = [c.text for c in batch]
+
+        vectors = await embedding_provider.embed_batch(texts)
+
+        for chunk, vector in zip(batch, vectors):
+            chunk.embedding = vector
+
+        total_embedded += len(batch)
+
+    await db.commit()
+    logger.info(
+        "Stored embeddings for %d/%d chunks (document %s).",
+        total_embedded, len(chunks), document_id,
+    )
+    return total_embedded
 
 
 class DocumentService:
@@ -212,6 +269,13 @@ class DocumentService:
         await classification_service.classify_and_persist(document_id, db)
         await entity_extraction_service.extract_and_persist(document_id, db)
         await clause_segmentation_service.segment_and_persist(document_id, db)
+        await document_chunker.chunk_and_persist(document_id, db)
+
+        try:
+            embedding_provider = get_embedding_provider()
+            await _generate_and_store_embeddings(document_id, embedding_provider, db)
+        except EmbeddingProviderError:
+            pass  # Embeddings are optional for pasted text; doc remains READY
 
         await db.refresh(doc)
         return doc
@@ -306,8 +370,33 @@ class DocumentService:
             await db.commit()
             await clause_segmentation_service.segment_and_persist(doc.id, db)
 
-            # 9. READY
-            doc.status = "READY"
+            # 9. CHUNKING_DOCUMENT (Phase 4)
+            doc.status = "CHUNKING_DOCUMENT"
+            doc.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            await document_chunker.chunk_and_persist(doc.id, db)
+
+            # 10. GENERATING_EMBEDDINGS (Phase 4)
+            doc.status = "GENERATING_EMBEDDINGS"
+            doc.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            try:
+                embedding_provider = get_embedding_provider()
+                await _generate_and_store_embeddings(doc.id, embedding_provider, db)
+                final_status = "READY"
+            except EmbeddingProviderError as emb_err:
+                # Embedding provider not configured — document is still useful
+                # for classification, entity extraction, and clause browsing.
+                logger.warning(
+                    "Embedding provider unavailable for document %s: %s. "
+                    "Document will be READY_WITHOUT_EMBEDDINGS.",
+                    doc.id, emb_err,
+                )
+                final_status = "READY_WITHOUT_EMBEDDINGS"
+
+            # 11. READY (or READY_WITHOUT_EMBEDDINGS)
+            doc.status = final_status
             doc.updated_at = datetime.now(timezone.utc)
             doc.error_code = None
             doc.error_message = None

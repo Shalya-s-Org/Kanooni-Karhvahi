@@ -29,6 +29,7 @@ dependencies = [
     "pillow>=10.0.0",
     "pytesseract>=0.3.10",
     "python-multipart>=0.0.9",
+    "pgvector>=0.3.0",
 ]
 
 [project.optional-dependencies]
@@ -40,7 +41,6 @@ dev = [
 db = [
     "asyncpg>=0.29.0",
     "psycopg2-binary>=2.9.9; python_version < '3.13'",
-    "pgvector>=0.3.0",
 ]
 
 [tool.setuptools.packages.find]

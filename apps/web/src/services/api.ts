@@ -9,6 +9,7 @@ import {
   DocumentEntityList,
   DocumentClauseList,
   DocumentClauseItem,
+  RetrievalResponseData,
 } from "../types";
 
 
@@ -263,3 +264,31 @@ export async function fetchDocumentClause(documentId: string, clauseId: string):
   }
 }
 
+
+// ─── Phase 4: Semantic Retrieval ────────────────────────────────────────────
+
+export async function retrieveDocumentChunks(
+  documentId: string,
+  query: string,
+  topK = 5,
+): Promise<ApiResponse<RetrievalResponseData>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/retrieve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, top_k: topK }),
+    });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Retrieval request failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}

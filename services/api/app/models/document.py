@@ -5,6 +5,15 @@ from sqlalchemy import String, Integer, Boolean, Float, Text, DateTime, ForeignK
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 
+# pgvector SQLAlchemy integration — imported lazily to allow SQLite fallback in tests.
+# The Vector type is only used when a real PostgreSQL+pgvector connection is available.
+try:
+    from pgvector.sqlalchemy import Vector as _PgVector  # type: ignore[import]
+    _PGVECTOR_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _PgVector = None
+    _PGVECTOR_AVAILABLE = False
+
 
 class Document(Base):
     """
@@ -114,34 +123,65 @@ class DocumentPage(Base):
 
 class DocumentChunk(Base):
     """
-    Text chunk foundation for future pgvector semantic indexing (Phase 4).
+    Semantic text chunk for pgvector-based retrieval (Phase 4).
+
+    Each chunk is traceable to its source document → page → clause.
+    The ``embedding`` column stores the dense vector produced by the
+    configured embedding model.  It is nullable so that chunking can
+    complete before embedding generation starts (and so the document can
+    reach READY_WITHOUT_EMBEDDINGS if the embedding provider is unavailable).
+
+    Cascade deletion:
+      Document → Pages → Clauses → Chunks (via ON DELETE CASCADE FKs)
     """
     __tablename__ = "document_chunks"
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         primary_key=True,
-        default=uuid.uuid4
+        default=uuid.uuid4,
     )
     document_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
     page_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("document_pages.id", ondelete="CASCADE"),
         nullable=True,
-        index=True
+        index=True,
+    )
+    clause_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("document_clauses.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     chunk_metadata: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
+    # pgvector embedding column — dimension is set by migration/DDL.
+    # Stored as native vector type; never serialised to JSON.
+    # Nullable: set to NULL until embedding generation completes.
+    if _PGVECTOR_AVAILABLE and _PgVector is not None:
+        embedding: Mapped[Optional[List[float]]] = mapped_column(
+            _PgVector(768),  # dimension overridden in migration via ALTER COLUMN
+            nullable=True,
+        )
+    else:
+        # SQLite fallback for tests — embedding stored as JSON array.
+        # This path is ONLY used in the automated test suite; it is NEVER
+        # exercised against a real PostgreSQL instance.
+        embedding: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)  # type: ignore[assignment]
 
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")
     page: Mapped[Optional["DocumentPage"]] = relationship("DocumentPage", back_populates="chunks")
+    clause: Mapped[Optional["DocumentClause"]] = relationship("DocumentClause", back_populates="chunks")
 
 
 class DocumentClassification(Base):
@@ -255,3 +295,8 @@ class DocumentClause(Base):
 
     document: Mapped["Document"] = relationship("Document", back_populates="clauses")
     page: Mapped[Optional["DocumentPage"]] = relationship("DocumentPage", back_populates="clauses")
+    chunks: Mapped[List["DocumentChunk"]] = relationship(
+        "DocumentChunk",
+        back_populates="clause",
+        cascade="all, delete-orphan",
+    )

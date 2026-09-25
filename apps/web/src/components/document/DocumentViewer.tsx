@@ -13,6 +13,7 @@ import {
   retryDocument,
 } from "../../services/api";
 import { DocumentEntityItem, DocumentClauseItem } from "../../types";
+import { SemanticRetrievalPanel } from "./SemanticRetrievalPanel";
 import {
   Loader2,
   AlertCircle,
@@ -35,15 +36,16 @@ import {
   Tag,
   HelpCircle,
   Layers,
+  Search,
 } from "lucide-react";
 
-const TERMINAL_STATUSES = new Set(["READY", "FAILED", "DELETED"]);
+const TERMINAL_STATUSES = new Set(["READY", "READY_WITHOUT_EMBEDDINGS", "FAILED", "DELETED"]);
 
 export const DocumentViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"entities" | "clauses" | "raw">("entities");
+  const [activeTab, setActiveTab] = useState<"entities" | "clauses" | "raw" | "retrieval">("entities");
   const [selectedEntity, setSelectedEntity] = useState<DocumentEntityItem | null>(null);
   const [selectedClause, setSelectedClause] = useState<DocumentClauseItem | null>(null);
   const [activePage, setActivePage] = useState<number>(1);
@@ -67,7 +69,7 @@ export const DocumentViewer: React.FC = () => {
     enabled: !!id,
   });
 
-  const isReady = statusQuery.data?.data?.status === "READY";
+  const isReady = statusQuery.data?.data?.status === "READY" || statusQuery.data?.data?.status === "READY_WITHOUT_EMBEDDINGS";
 
   // Pages
   const pagesQuery = useQuery({
@@ -355,6 +357,17 @@ export const DocumentViewer: React.FC = () => {
               >
                 <FileText className="w-3.5 h-3.5" /> Extracted Text ({pages.length})
               </button>
+              <button
+                onClick={() => setActiveTab("retrieval")}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition ${
+                  activeTab === "retrieval"
+                    ? "border-violet-600 text-violet-600 bg-white"
+                    : "border-transparent text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Search className="w-3.5 h-3.5" /> Retrieval
+                <span className="ml-0.5 px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[10px] font-bold rounded-full">DEV</span>
+              </button>
             </div>
           )}
 
@@ -611,6 +624,14 @@ export const DocumentViewer: React.FC = () => {
               </div>
             )}
 
+            {/* TAB 4: Semantic Retrieval — Phase 4 Developer Tool */}
+            {isReady && activeTab === "retrieval" && id && (
+              <SemanticRetrievalPanel
+                documentId={id}
+                onPageNavigate={(page) => setActivePage(page)}
+              />
+            )}
+
             {/* Non-ready loading state */}
             {!status && (
               <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-2">
@@ -728,6 +749,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { color: string; icon: React.ReactNode }> = {
     READY: { color: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-3 h-3" /> },
+    READY_WITHOUT_EMBEDDINGS: { color: "bg-amber-100 text-amber-700", icon: <CheckCircle2 className="w-3 h-3" /> },
     FAILED: { color: "bg-red-100 text-red-700", icon: <AlertCircle className="w-3 h-3" /> },
     DELETED: { color: "bg-slate-200 text-slate-500", icon: <Trash2 className="w-3 h-3" /> },
   };

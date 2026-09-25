@@ -42,7 +42,7 @@ export function App() {
               </div>
               <div className="flex items-center space-x-2 text-xs">
                 <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-medium">
-                  Phase 2: Document Pipeline
+                  Phase 4: Semantic Retrieval
                 </span>
               </div>
             </div>

@@ -1,18 +1,8 @@
-from typing import Dict, Type
-from app.ai.embeddings.base import EmbeddingProvider, MockEmbeddingProvider
-from app.core.config import settings
-from app.core.logging import logger
+"""
+Backward-compatibility shim.
 
-_EMBEDDINGS: Dict[str, Type[EmbeddingProvider]] = {
-    "mock": MockEmbeddingProvider,
-}
+The canonical embedding factory lives in app.rag.embeddings.factory.
+"""
+from app.rag.embeddings.factory import get_embedding_provider  # noqa: F401
 
-
-def get_embedding_provider(name: str = None) -> EmbeddingProvider:
-    provider_name = (name or settings.EMBEDDING_PROVIDER).lower()
-
-    if provider_name in _EMBEDDINGS:
-        return _EMBEDDINGS[provider_name]()
-
-    logger.warning("Embedding provider '%s' not registered yet. Falling back to MockEmbeddingProvider.", provider_name)
-    return MockEmbeddingProvider()
+__all__ = ["get_embedding_provider"]
