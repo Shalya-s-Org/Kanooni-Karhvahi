@@ -33,6 +33,9 @@ export type DocumentProcessingStatus =
   | "OCR_REQUIRED"
   | "OCR_PROCESSING"
   | "EXTRACTED"
+  | "CLASSIFYING"
+  | "EXTRACTING_ENTITIES"
+  | "SEGMENTING_CLAUSES"
   | "READY"
   | "FAILED"
   | "DELETING"
@@ -79,3 +82,56 @@ export interface DocumentPagesList {
   page_count: number;
   pages: DocumentPageItem[];
 }
+
+export interface ClassificationEvidence {
+  page: number;
+  text: string;
+}
+
+export interface DocumentClassificationInfo {
+  document_type: string;
+  confidence: number;
+  evidence: ClassificationEvidence[];
+}
+
+export interface DocumentEntityItem {
+  id: string;
+  document_id: string;
+  page_id?: string | null;
+  page_number: number;
+  entity_type: string;
+  value: string;
+  normalized_value?: string | null;
+  entity_metadata?: Record<string, unknown> | null;
+  source_text: string;
+  start_offset?: number | null;
+  end_offset?: number | null;
+  confidence: number;
+  created_at: string;
+}
+
+export interface DocumentEntityList {
+  document_id: string;
+  total_count: number;
+  entities: DocumentEntityItem[];
+}
+
+export interface DocumentClauseItem {
+  id: string;
+  document_id: string;
+  page_id?: string | null;
+  clause_number?: string | null;
+  title?: string | null;
+  original_text: string;
+  page_start: number;
+  page_end: number;
+  confidence: number;
+  created_at: string;
+}
+
+export interface DocumentClauseList {
+  document_id: string;
+  total_count: number;
+  clauses: DocumentClauseItem[];
+}
+

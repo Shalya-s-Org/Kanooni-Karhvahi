@@ -12,6 +12,9 @@ from app.models.document import Document, DocumentPage
 from app.document.storage import LocalDocumentStorage, document_storage
 from app.document.ocr_factory import get_ocr_provider
 from app.document.extractor import DocumentExtractor
+from app.classification import classification_service
+from app.extraction import entity_extraction_service
+from app.clauses import clause_segmentation_service
 
 # Allowed MIME types and extensions
 ALLOWED_MIME_TYPES = {
@@ -23,17 +26,21 @@ ALLOWED_MIME_TYPES = {
 
 STATUS_PROGRESS_MAP = {
     "UPLOADED": (5, "Document uploaded to secure vault"),
-    "VALIDATING": (15, "Validating file integrity and format"),
-    "PROCESSING": (25, "Preparing extraction environment"),
-    "EXTRACTING": (45, "Extracting text and page boundaries"),
-    "OCR_REQUIRED": (55, "Scanned page detected, preparing OCR"),
-    "OCR_PROCESSING": (75, "Performing optical character recognition"),
-    "EXTRACTED": (90, "Finalizing page records"),
+    "VALIDATING": (10, "Validating file integrity and format"),
+    "PROCESSING": (20, "Preparing extraction environment"),
+    "EXTRACTING": (35, "Extracting text and page boundaries"),
+    "OCR_REQUIRED": (45, "Scanned page detected, preparing OCR"),
+    "OCR_PROCESSING": (55, "Performing optical character recognition"),
+    "EXTRACTED": (65, "Finalizing page records"),
+    "CLASSIFYING": (75, "Classifying document type"),
+    "EXTRACTING_ENTITIES": (85, "Extracting action-relevant entities"),
+    "SEGMENTING_CLAUSES": (95, "Segmenting document clauses"),
     "READY": (100, "Ready for comprehension and analysis"),
     "FAILED": (0, "Processing encountered an issue"),
     "DELETING": (0, "Purging document data"),
     "DELETED": (0, "Document purged permanently"),
 }
+
 
 
 class DocumentValidationError(Exception):
@@ -200,12 +207,18 @@ class DocumentService:
         )
         db.add(page)
         await db.commit()
+
+        # Run intelligence pipeline on pasted text document
+        await classification_service.classify_and_persist(document_id, db)
+        await entity_extraction_service.extract_and_persist(document_id, db)
+        await clause_segmentation_service.segment_and_persist(document_id, db)
+
         await db.refresh(doc)
         return doc
 
     async def process_document_pipeline(self, document_id: uuid.UUID, db: AsyncSession) -> Document:
         """
-        Executes the extraction and OCR pipeline.
+        Executes the extraction and OCR pipeline followed by Phase 3 document intelligence.
         Designed to be called synchronously by API or asynchronously by Celery worker.
         """
         query = select(Document).where(Document.id == document_id)
@@ -270,9 +283,31 @@ class DocumentService:
                 )
                 db.add(page_record)
 
-            # 6. READY
-            doc.status = "READY"
             doc.page_count = extracted.total_pages
+            doc.status = "EXTRACTED"
+            doc.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            # 6. CLASSIFYING (Phase 3)
+            doc.status = "CLASSIFYING"
+            doc.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            await classification_service.classify_and_persist(doc.id, db)
+
+            # 7. EXTRACTING_ENTITIES (Phase 3)
+            doc.status = "EXTRACTING_ENTITIES"
+            doc.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            await entity_extraction_service.extract_and_persist(doc.id, db)
+
+            # 8. SEGMENTING_CLAUSES (Phase 3)
+            doc.status = "SEGMENTING_CLAUSES"
+            doc.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            await clause_segmentation_service.segment_and_persist(doc.id, db)
+
+            # 9. READY
+            doc.status = "READY"
             doc.updated_at = datetime.now(timezone.utc)
             doc.error_code = None
             doc.error_message = None
@@ -281,6 +316,7 @@ class DocumentService:
             await db.commit()
             await db.refresh(doc)
             return doc
+
 
         except Exception as e:
             logger.error("Error processing document %s: %s", document_id, e, exc_info=True)

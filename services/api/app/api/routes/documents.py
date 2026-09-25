@@ -15,13 +15,28 @@ from app.schemas.document import (
     DocumentPagesListResponse,
     PastedTextRequest,
 )
-from app.models.document import Document, DocumentPage
+from app.schemas.intelligence import (
+    ClassificationResponse,
+    ClassificationEvidenceSchema,
+    EntityResponse,
+    EntityListResponse,
+    ClauseResponse,
+    ClauseListResponse,
+)
+from app.models.document import (
+    Document,
+    DocumentPage,
+    DocumentClassification,
+    DocumentEntity,
+    DocumentClause,
+)
 from app.services.document_service import (
     document_service,
     DocumentValidationError,
     STATUS_PROGRESS_MAP,
 )
 from app.core.logging import logger
+
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -313,3 +328,199 @@ async def retry_document_processing(
             retryable=False
         )
     )
+
+
+@router.get(
+    "/{document_id}/classification",
+    response_model=ApiResponse[ClassificationResponse],
+    summary="Get Document Classification",
+    description="Returns broad legal document type, calibrated confidence, and traceable evidence snippets."
+)
+async def get_document_classification(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+) -> ApiResponse[ClassificationResponse]:
+    doc_query = select(Document).where(Document.id == document_id)
+    doc_res = await db.execute(doc_query)
+    doc = doc_res.scalars().first()
+    if not doc:
+        return ApiResponse.fail(code="DOCUMENT_NOT_FOUND", message="Document not found.", retryable=False)
+
+    cls_query = select(DocumentClassification).where(DocumentClassification.document_id == document_id)
+    cls_res = await db.execute(cls_query)
+    classification = cls_res.scalars().first()
+
+    if not classification:
+        return ApiResponse.fail(
+            code="CLASSIFICATION_NOT_FOUND",
+            message="Classification not yet available. Document may still be processing.",
+            retryable=True
+        )
+
+    evidence_items = [
+        ClassificationEvidenceSchema(page=e.get("page", 1), text=e.get("text", ""))
+        for e in (classification.evidence or [])
+    ]
+
+    return ApiResponse.ok(
+        data=ClassificationResponse(
+            document_type=classification.document_type,
+            confidence=classification.confidence,
+            evidence=evidence_items
+        )
+    )
+
+
+@router.get(
+    "/{document_id}/entities",
+    response_model=ApiResponse[EntityListResponse],
+    summary="Get Extracted Legal Entities",
+    description="Returns structured entities (dates, deadlines, amounts, parties, authorities, reference numbers, legal sections) with optional ?type= filter."
+)
+async def get_document_entities(
+    document_id: uuid.UUID,
+    type: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+) -> ApiResponse[EntityListResponse]:
+    doc_query = select(Document).where(Document.id == document_id)
+    doc_res = await db.execute(doc_query)
+    doc = doc_res.scalars().first()
+    if not doc:
+        return ApiResponse.fail(code="DOCUMENT_NOT_FOUND", message="Document not found.", retryable=False)
+
+    query = select(DocumentEntity).where(DocumentEntity.document_id == document_id)
+
+    if type:
+        norm_type = type.upper().strip()
+        # Convenience mapping: ?type=PARTY can match PERSON or ORGANIZATION
+        if norm_type == "PARTY":
+            query = query.where(DocumentEntity.entity_type.in_(["PERSON", "ORGANIZATION"]))
+        elif norm_type in ["DATE", "DEADLINE"]:
+            # If user asks for DATE, return DATE and DEADLINE
+            if norm_type == "DATE":
+                query = query.where(DocumentEntity.entity_type.in_(["DATE", "DEADLINE"]))
+            else:
+                query = query.where(DocumentEntity.entity_type == "DEADLINE")
+        else:
+            query = query.where(DocumentEntity.entity_type == norm_type)
+
+    query = query.order_by(DocumentEntity.page_number, DocumentEntity.start_offset)
+    result = await db.execute(query)
+    entities = list(result.scalars().all())
+
+    items = [
+        EntityResponse(
+            id=e.id,
+            document_id=e.document_id,
+            page_id=e.page_id,
+            page_number=e.page_number,
+            entity_type=e.entity_type,
+            value=e.value,
+            normalized_value=e.normalized_value,
+            entity_metadata=e.entity_metadata,
+            source_text=e.source_text,
+            start_offset=e.start_offset,
+            end_offset=e.end_offset,
+            confidence=e.confidence,
+            created_at=e.created_at
+        )
+        for e in entities
+    ]
+
+    return ApiResponse.ok(
+        data=EntityListResponse(
+            document_id=doc.id,
+            total_count=len(items),
+            entities=items
+        )
+    )
+
+
+@router.get(
+    "/{document_id}/clauses",
+    response_model=ApiResponse[ClauseListResponse],
+    summary="Get Document Clauses",
+    description="Returns identified logical clauses and sections with page boundaries and verbatim text."
+)
+async def get_document_clauses(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+) -> ApiResponse[ClauseListResponse]:
+    doc_query = select(Document).where(Document.id == document_id)
+    doc_res = await db.execute(doc_query)
+    doc = doc_res.scalars().first()
+    if not doc:
+        return ApiResponse.fail(code="DOCUMENT_NOT_FOUND", message="Document not found.", retryable=False)
+
+    query = (
+        select(DocumentClause)
+        .where(DocumentClause.document_id == document_id)
+        .order_by(DocumentClause.page_start, DocumentClause.id)
+    )
+    result = await db.execute(query)
+    clauses = list(result.scalars().all())
+
+    items = [
+        ClauseResponse(
+            id=c.id,
+            document_id=c.document_id,
+            page_id=c.page_id,
+            clause_number=c.clause_number,
+            title=c.title,
+            original_text=c.original_text,
+            page_start=c.page_start,
+            page_end=c.page_end,
+            confidence=c.confidence,
+            created_at=c.created_at
+        )
+        for c in clauses
+    ]
+
+    return ApiResponse.ok(
+        data=ClauseListResponse(
+            document_id=doc.id,
+            total_count=len(items),
+            clauses=items
+        )
+    )
+
+
+@router.get(
+    "/{document_id}/clauses/{clause_id}",
+    response_model=ApiResponse[ClauseResponse],
+    summary="Get Specific Clause",
+    description="Returns details and source context for a specific clause."
+)
+async def get_specific_clause(
+    document_id: uuid.UUID,
+    clause_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+) -> ApiResponse[ClauseResponse]:
+    query = (
+        select(DocumentClause)
+        .where(
+            DocumentClause.document_id == document_id,
+            DocumentClause.id == clause_id
+        )
+    )
+    result = await db.execute(query)
+    clause = result.scalars().first()
+
+    if not clause:
+        return ApiResponse.fail(code="CLAUSE_NOT_FOUND", message="Clause not found.", retryable=False)
+
+    return ApiResponse.ok(
+        data=ClauseResponse(
+            id=clause.id,
+            document_id=clause.document_id,
+            page_id=clause.page_id,
+            clause_number=clause.clause_number,
+            title=clause.title,
+            original_text=clause.original_text,
+            page_start=clause.page_start,
+            page_end=clause.page_end,
+            confidence=clause.confidence,
+            created_at=clause.created_at
+        )
+    )
+

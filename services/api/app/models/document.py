@@ -50,6 +50,23 @@ class Document(Base):
         cascade="all, delete-orphan",
         order_by="DocumentChunk.chunk_index"
     )
+    classification: Mapped[Optional["DocumentClassification"]] = relationship(
+        "DocumentClassification",
+        back_populates="document",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+    entities: Mapped[List["DocumentEntity"]] = relationship(
+        "DocumentEntity",
+        back_populates="document",
+        cascade="all, delete-orphan"
+    )
+    clauses: Mapped[List["DocumentClause"]] = relationship(
+        "DocumentClause",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentClause.page_start"
+    )
 
 
 class DocumentPage(Base):
@@ -80,6 +97,16 @@ class DocumentPage(Base):
     document: Mapped["Document"] = relationship("Document", back_populates="pages")
     chunks: Mapped[List["DocumentChunk"]] = relationship(
         "DocumentChunk",
+        back_populates="page",
+        cascade="all, delete-orphan"
+    )
+    entities: Mapped[List["DocumentEntity"]] = relationship(
+        "DocumentEntity",
+        back_populates="page",
+        cascade="all, delete-orphan"
+    )
+    clauses: Mapped[List["DocumentClause"]] = relationship(
+        "DocumentClause",
         back_populates="page",
         cascade="all, delete-orphan"
     )
@@ -115,3 +142,116 @@ class DocumentChunk(Base):
 
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")
     page: Mapped[Optional["DocumentPage"]] = relationship("DocumentPage", back_populates="chunks")
+
+
+class DocumentClassification(Base):
+    """
+    Broad legal document classification with confidence and traceable evidence snippets.
+    """
+    __tablename__ = "document_classifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True
+    )
+    document_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    evidence: Mapped[Any] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    document: Mapped["Document"] = relationship("Document", back_populates="classification")
+
+
+class DocumentEntity(Base):
+    """
+    Action-relevant structured entity (dates, deadlines, amounts, parties, authorities, reference numbers, legal sections).
+    Preserves exact page, source text excerpt, and character offsets.
+    """
+    __tablename__ = "document_entities"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    page_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("document_pages.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    value: Mapped[str] = mapped_column(String(512), nullable=False)
+    normalized_value: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    entity_metadata: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    source_text: Mapped[str] = mapped_column(Text, nullable=False)
+    start_offset: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    end_offset: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    document: Mapped["Document"] = relationship("Document", back_populates="entities")
+    page: Mapped[Optional["DocumentPage"]] = relationship("DocumentPage", back_populates="entities")
+
+
+class DocumentClause(Base):
+    """
+    Logical clause or section segmented from the document text.
+    Preserves original text, title, clause numbering, and source page span.
+    """
+    __tablename__ = "document_clauses"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    page_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("document_pages.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
+    clause_number: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    original_text: Mapped[str] = mapped_column(Text, nullable=False)
+    page_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    page_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    document: Mapped["Document"] = relationship("Document", back_populates="clauses")
+    page: Mapped[Optional["DocumentPage"]] = relationship("DocumentPage", back_populates="clauses")

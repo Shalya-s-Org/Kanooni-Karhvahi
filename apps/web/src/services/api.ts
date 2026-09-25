@@ -5,7 +5,12 @@ import {
   DocumentStatusInfo,
   DocumentMetadata,
   DocumentPagesList,
+  DocumentClassificationInfo,
+  DocumentEntityList,
+  DocumentClauseList,
+  DocumentClauseItem,
 } from "../types";
+
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -181,3 +186,80 @@ export async function retryDocument(documentId: string): Promise<ApiResponse<Doc
     };
   }
 }
+
+export async function fetchDocumentClassification(documentId: string): Promise<ApiResponse<DocumentClassificationInfo>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/classification`);
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Classification fetch failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function fetchDocumentEntities(documentId: string, type?: string): Promise<ApiResponse<DocumentEntityList>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/documents/${documentId}/entities`);
+    if (type) {
+      url.searchParams.set("type", type);
+    }
+    const res = await fetch(url.toString());
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Entities fetch failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function fetchDocumentClauses(documentId: string): Promise<ApiResponse<DocumentClauseList>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/clauses`);
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Clauses fetch failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function fetchDocumentClause(documentId: string, clauseId: string): Promise<ApiResponse<DocumentClauseItem>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/clauses/${clauseId}`);
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Clause fetch failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+

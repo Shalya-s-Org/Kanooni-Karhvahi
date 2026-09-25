@@ -22,6 +22,9 @@ export enum DocumentProcessingStatus {
   OCR_REQUIRED = "OCR_REQUIRED",
   OCR_PROCESSING = "OCR_PROCESSING",
   EXTRACTED = "EXTRACTED",
+  CLASSIFYING = "CLASSIFYING",
+  EXTRACTING_ENTITIES = "EXTRACTING_ENTITIES",
+  SEGMENTING_CLAUSES = "SEGMENTING_CLAUSES",
   READY = "READY",
   FAILED = "FAILED",
   DELETING = "DELETING",
@@ -29,20 +32,22 @@ export enum DocumentProcessingStatus {
 }
 
 /**
- * Document classifications for Indian legal context.
+ * Controlled document classifications for Indian legal context (Phase 3).
  */
 export enum DocumentType {
+  FIR = "FIR",
+  GOVERNMENT_NOTICE = "GOVERNMENT_NOTICE",
   LEGAL_NOTICE = "LEGAL_NOTICE",
-  EMPLOYMENT_AGREEMENT = "EMPLOYMENT_AGREEMENT",
-  RENT_LEASE_AGREEMENT = "RENT_LEASE_AGREEMENT",
-  COMMERCIAL_CONTRACT = "COMMERCIAL_CONTRACT",
-  COURT_ORDER = "COURT_ORDER",
-  WRIT_PETITION = "WRIT_PETITION",
-  CONSUMER_COMPLAINT = "CONSUMER_COMPLAINT",
-  LOAN_AGREEMENT = "LOAN_AGREEMENT",
-  GENERAL_AFFIDAVIT = "GENERAL_AFFIDAVIT",
-  OTHER = "OTHER"
+  CONTRACT = "CONTRACT",
+  PROPERTY_DOCUMENT = "PROPERTY_DOCUMENT",
+  EMPLOYMENT_DOCUMENT = "EMPLOYMENT_DOCUMENT",
+  LOAN_DOCUMENT = "LOAN_DOCUMENT",
+  FAMILY_LAW_DOCUMENT = "FAMILY_LAW_DOCUMENT",
+  COURT_DOCUMENT = "COURT_DOCUMENT",
+  OTHER = "OTHER",
+  UNKNOWN = "UNKNOWN"
 }
+
 
 /**
  * Supported Indian regional languages for translation & explanation.
@@ -116,3 +121,56 @@ export interface DocumentStatusInfo {
   error: string | null;
   retryable: boolean;
 }
+
+/**
+  * Document classification evidence.
+  */
+export interface ClassificationEvidence {
+  page: number;
+  text: string;
+}
+
+/**
+  * Document classification result.
+  */
+export interface DocumentClassificationInfo {
+  document_type: DocumentType | string;
+  confidence: number;
+  evidence: ClassificationEvidence[];
+}
+
+/**
+  * Structured extracted entity with source traceability.
+  */
+export interface DocumentEntityItem {
+  id: string;
+  document_id: string;
+  page_id?: string | null;
+  page_number: number;
+  entity_type: string;
+  value: string;
+  normalized_value?: string | null;
+  entity_metadata?: Record<string, unknown> | null;
+  source_text: string;
+  start_offset?: number | null;
+  end_offset?: number | null;
+  confidence: number;
+  created_at: string;
+}
+
+/**
+  * Segmented document clause/section.
+  */
+export interface DocumentClauseItem {
+  id: string;
+  document_id: string;
+  page_id?: string | null;
+  clause_number?: string | null;
+  title?: string | null;
+  original_text: string;
+  page_start: number;
+  page_end: number;
+  confidence: number;
+  created_at: string;
+}
+

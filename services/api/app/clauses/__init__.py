@@ -1,4 +1,11 @@
-"""
-Clause segmentation, plain-language translation, and risk explanation module.
-TODO (Phase 3): Implement clause boundary detector and simplification engine.
-"""
+from app.clauses.segmenter import (
+    ExtractedClause,
+    ClauseSegmentationService,
+    clause_segmentation_service,
+)
+
+__all__ = [
+    "ExtractedClause",
+    "ClauseSegmentationService",
+    "clause_segmentation_service",
+]
