@@ -1,41 +1,64 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
+
+
+class OCRResult(BaseModel):
+    """
+    Structured outcome of an OCR extraction on an image page.
+    """
+    text: str = Field(..., description="Extracted plain text")
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Confidence metric")
+    width: Optional[int] = Field(default=None, description="Image width")
+    height: Optional[int] = Field(default=None, description="Image height")
+    blocks: Optional[List[Dict[str, Any]]] = Field(default=None, description="Layout bounding boxes")
+
+
+class OCRDependencyMissingError(RuntimeError):
+    """
+    Raised when an OCR engine (e.g. Tesseract) is not installed on the host system.
+    """
+    pass
 
 
 class OCRProvider(ABC):
     """
     Abstract Base Class for OCR engines.
-    Isolates external engines (Tesseract, EasyOCR, Google Cloud Vision) from the core processing pipeline.
     """
 
     @abstractmethod
-    async def extract_text(self, file_path: str) -> str:
+    def is_available(self) -> bool:
         """
-        Extracts raw plain text from an image or scanned PDF document.
+        Returns True if the underlying OCR engine is installed and ready.
         """
         pass
 
     @abstractmethod
-    async def extract_layout(self, file_path: str) -> List[Dict[str, Any]]:
+    async def extract_from_image(self, image_path: str) -> OCRResult:
         """
-        Extracts text blocks with bounding boxes and page numbers.
+        Runs OCR on an image file path and returns structured text and dimensions.
         """
         pass
 
 
 class MockOCRProvider(OCRProvider):
     """
-    Mock OCR provider for tests and local development.
+    Deterministic Mock OCR provider for automated testing and offline environments.
     """
 
-    async def extract_text(self, file_path: str) -> str:
-        return "[MOCK OCR]: Simulated extracted text from legal document."
+    def __init__(self, simulated_text: str = "[MOCK OCR EXTRACTED TEXT]: In the High Court of Judicature at New Delhi..."):
+        self.simulated_text = simulated_text
 
-    async def extract_layout(self, file_path: str) -> List[Dict[str, Any]]:
-        return [
-            {
-                "page": 1,
-                "text": "[MOCK OCR BLOCK 1]: In the High Court of Judicature...",
-                "bbox": [0, 0, 100, 100]
-            }
-        ]
+    def is_available(self) -> bool:
+        return True
+
+    async def extract_from_image(self, image_path: str) -> OCRResult:
+        return OCRResult(
+            text=self.simulated_text,
+            confidence=0.95,
+            width=2480,
+            height=3508,
+            blocks=[
+                {"box": [100, 100, 500, 150], "text": "High Court of Judicature"}
+            ]
+        )

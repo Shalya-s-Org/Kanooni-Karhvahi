@@ -12,18 +12,20 @@ export const LEGAL_DISCLAIMER =
   "Kanooni Karhvahi is an AI-powered legal document comprehension tool designed for informational purposes only. It is not an attorney, law firm, or substitute for legal counsel. It does not provide legal advice, representation, or outcome predictions.";
 
 /**
- * Processing status states for an uploaded legal document.
+ * Processing state machine for an uploaded legal document (Phase 2 specification).
  */
 export enum DocumentProcessingStatus {
-  PENDING = "PENDING",
-  UPLOADING = "UPLOADING",
+  UPLOADED = "UPLOADED",
+  VALIDATING = "VALIDATING",
   PROCESSING = "PROCESSING",
-  OCR_IN_PROGRESS = "OCR_IN_PROGRESS",
-  ANALYZING = "ANALYZING",
-  INDEXING = "INDEXING",
-  COMPLETED = "COMPLETED",
+  EXTRACTING = "EXTRACTING",
+  OCR_REQUIRED = "OCR_REQUIRED",
+  OCR_PROCESSING = "OCR_PROCESSING",
+  EXTRACTED = "EXTRACTED",
+  READY = "READY",
   FAILED = "FAILED",
-  EXPIRED = "EXPIRED"
+  DELETING = "DELETING",
+  DELETED = "DELETED"
 }
 
 /**
@@ -75,4 +77,42 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
   error: ApiError | null;
+}
+
+/**
+ * Document metadata transfer object.
+ */
+export interface DocumentMetadata {
+  id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  page_count: number;
+  status: DocumentProcessingStatus;
+  created_at: string;
+  expires_at: string;
+}
+
+/**
+ * Document page extracted text object.
+ */
+export interface DocumentPageItem {
+  page_number: number;
+  text: string;
+  ocr_used: boolean;
+  ocr_confidence: number | null;
+  width: number | null;
+  height: number | null;
+}
+
+/**
+ * Document status polling response.
+ */
+export interface DocumentStatusInfo {
+  document_id: string;
+  status: DocumentProcessingStatus;
+  progress: number;
+  stage: string;
+  error: string | null;
+  retryable: boolean;
 }
