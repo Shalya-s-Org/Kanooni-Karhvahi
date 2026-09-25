@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kanooni-karhvahi-worker"
+version = "0.1.0"
+description = "Celery background task worker for Kanooni Karhvahi"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Kanooni Karhvahi Team" }
+]
+dependencies = [
+    "celery>=5.4.0",
+    "redis>=5.0.0",
+    "pydantic-settings>=2.4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["worker*"]

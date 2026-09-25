@@ -1,0 +1,21 @@
+{
+  "name": "@kanooni/shared",
+  "version": "0.1.0",
+  "description": "Shared contracts, constants, and types for Kanooni Karhvahi",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "legal",
+    "india",
+    "multilingual",
+    "contracts"
+  ],
+  "author": "Kanooni Karhvahi Team",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
