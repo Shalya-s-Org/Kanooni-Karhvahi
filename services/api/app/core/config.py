@@ -42,10 +42,13 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
-    # AI / LLM Provider Configuration (Gemini, OpenAI, Anthropic, Ollama, Mock)
+    # AI / LLM Provider Configuration (Gemini, OpenAI, Groq, Ollama, Mock)
     LLM_PROVIDER: str = "mock"
     LLM_API_KEY: Optional[str] = None
-    LLM_MODEL: str = "gemini-1.5-flash"
+    LLM_MODEL: str = "openai/gpt-oss-20b"
+    # Base URL for OpenAI-compatible providers (e.g. Groq, Ollama).
+    # Leave unset for standard OpenAI; set to https://api.groq.com/openai/v1 for Groq.
+    LLM_BASE_URL: Optional[str] = None
     # Phase 5 aliases for AI configuration
     AI_PROVIDER: Optional[str] = None
     AI_API_KEY: Optional[str] = None

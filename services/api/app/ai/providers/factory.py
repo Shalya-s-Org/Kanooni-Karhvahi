@@ -51,6 +51,14 @@ except ImportError:
 except Exception as _e:
     logger.debug("Gemini provider registration skipped: %s", _e)
 
+# Register the Groq provider (uses httpx — always available).
+try:
+    from app.ai.providers.groq import GroqLLMProvider
+    _REGISTRY["groq"] = GroqLLMProvider
+    logger.debug("Groq LLM provider registered.")
+except Exception as _e:
+    logger.debug("Groq provider registration skipped: %s", _e)
+
 
 def get_llm_provider(name: Optional[str] = None) -> BaseLLMProvider:
     """
