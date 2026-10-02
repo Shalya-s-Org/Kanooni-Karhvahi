@@ -76,6 +76,16 @@ class Document(Base):
         cascade="all, delete-orphan",
         order_by="DocumentClause.page_start"
     )
+    analyses: Mapped[List["DocumentAnalysis"]] = relationship(
+        "DocumentAnalysis",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+    clause_analyses: Mapped[List["ClauseAnalysis"]] = relationship(
+        "ClauseAnalysis",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
 
 
 class DocumentPage(Base):
@@ -297,6 +307,11 @@ class DocumentClause(Base):
     page: Mapped[Optional["DocumentPage"]] = relationship("DocumentPage", back_populates="clauses")
     chunks: Mapped[List["DocumentChunk"]] = relationship(
         "DocumentChunk",
+        back_populates="clause",
+        cascade="all, delete-orphan",
+    )
+    analyses: Mapped[List["ClauseAnalysis"]] = relationship(
+        "ClauseAnalysis",
         back_populates="clause",
         cascade="all, delete-orphan",
     )

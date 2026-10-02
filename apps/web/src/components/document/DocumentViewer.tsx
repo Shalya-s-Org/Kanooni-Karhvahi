@@ -14,6 +14,7 @@ import {
 } from "../../services/api";
 import { DocumentEntityItem, DocumentClauseItem } from "../../types";
 import { SemanticRetrievalPanel } from "./SemanticRetrievalPanel";
+import { DocumentSummaryPanel, ClauseExplanationCard } from "../analysis";
 import {
   Loader2,
   AlertCircle,
@@ -37,6 +38,7 @@ import {
   HelpCircle,
   Layers,
   Search,
+  Sparkles,
 } from "lucide-react";
 
 const TERMINAL_STATUSES = new Set(["READY", "READY_WITHOUT_EMBEDDINGS", "FAILED", "DELETED"]);
@@ -45,7 +47,7 @@ export const DocumentViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"entities" | "clauses" | "raw" | "retrieval">("entities");
+  const [activeTab, setActiveTab] = useState<"summary" | "entities" | "clauses" | "raw" | "retrieval">("summary");
   const [selectedEntity, setSelectedEntity] = useState<DocumentEntityItem | null>(null);
   const [selectedClause, setSelectedClause] = useState<DocumentClauseItem | null>(null);
   const [activePage, setActivePage] = useState<number>(1);
@@ -328,6 +330,16 @@ export const DocumentViewer: React.FC = () => {
           {isReady && (
             <div className="flex border-b border-slate-200 px-4 bg-slate-50/50">
               <button
+                onClick={() => setActiveTab("summary")}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition ${
+                  activeTab === "summary"
+                    ? "border-blue-600 text-blue-600 bg-white"
+                    : "border-transparent text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> AI Summary
+              </button>
+              <button
                 onClick={() => setActiveTab("entities")}
                 className={`px-4 py-2 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition ${
                   activeTab === "entities"
@@ -373,6 +385,19 @@ export const DocumentViewer: React.FC = () => {
 
           {/* Tab Contents */}
           <div className="flex-1 overflow-auto p-4 space-y-4">
+            {/* TAB 0: AI Document Summary — Phase 5 */}
+            {isReady && activeTab === "summary" && id && (
+              <DocumentSummaryPanel
+                documentId={id}
+                isReady={isReady}
+                onPageNavigate={(page) => setActivePage(page)}
+                onClauseSelect={(clauseId) => {
+                  const targetClause = clauses.find((c) => c.id === clauseId);
+                  if (targetClause) handleSelectClause(targetClause);
+                }}
+              />
+            )}
+
             {/* TAB 1: Key Details (Structured Entities) */}
             {isReady && activeTab === "entities" && (
               <div className="space-y-4">
@@ -562,34 +587,13 @@ export const DocumentViewer: React.FC = () => {
                   <p className="text-xs text-slate-400 italic">No structured clauses detected.</p>
                 ) : (
                   clauses.map((clause) => (
-                    <div
+                    <ClauseExplanationCard
                       key={clause.id}
-                      onClick={() => handleSelectClause(clause)}
-                      className={`p-3.5 rounded-lg border transition cursor-pointer ${
-                        selectedClause?.id === clause.id
-                          ? "border-blue-500 bg-blue-50/50 shadow-xs"
-                          : "border-slate-200 bg-white hover:border-slate-300"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          {clause.clause_number && (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded font-bold text-xs font-mono">
-                              {clause.clause_number}
-                            </span>
-                          )}
-                          {clause.title && (
-                            <h4 className="text-xs font-bold text-slate-800">{clause.title}</h4>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          Page {clause.page_start}{clause.page_end > clause.page_start ? `–${clause.page_end}` : ""}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-700 whitespace-pre-wrap font-serif leading-relaxed line-clamp-4">
-                        {clause.original_text}
-                      </p>
-                    </div>
+                      documentId={id!}
+                      clause={clause}
+                      isSelected={selectedClause?.id === clause.id}
+                      onSelect={() => handleSelectClause(clause)}
+                    />
                   ))
                 )}
               </div>

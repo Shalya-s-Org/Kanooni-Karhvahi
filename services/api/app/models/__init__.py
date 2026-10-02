@@ -7,6 +7,12 @@ from app.models.document import (
     DocumentEntity,
     DocumentClause,
 )
+from app.models.analysis import (
+    DocumentAnalysis,
+    ClauseAnalysis,
+    AnalysisStatus,
+    AnalysisType,
+)
 
 __all__ = [
     "Base",
@@ -16,5 +22,8 @@ __all__ = [
     "DocumentClassification",
     "DocumentEntity",
     "DocumentClause",
+    "DocumentAnalysis",
+    "ClauseAnalysis",
+    "AnalysisStatus",
+    "AnalysisType",
 ]
-

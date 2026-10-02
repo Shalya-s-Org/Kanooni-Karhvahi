@@ -10,6 +10,8 @@ import {
   DocumentClauseList,
   DocumentClauseItem,
   RetrievalResponseData,
+  DocumentSummaryData,
+  ClauseExplanationData,
 } from "../types";
 
 
@@ -287,6 +289,109 @@ export async function retrieveDocumentChunks(
       error: {
         code: "NETWORK_ERROR",
         message: `Retrieval request failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+
+// ─── Phase 5: AI Comprehension & Analysis ───────────────────────────────────
+
+export async function fetchDocumentSummary(
+  documentId: string
+): Promise<ApiResponse<DocumentSummaryData>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/summary`);
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Summary fetch failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function generateDocumentSummary(
+  documentId: string,
+  force = false
+): Promise<ApiResponse<DocumentSummaryData>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/documents/${documentId}/summary`);
+    if (force) {
+      url.searchParams.set("force_regenerate", "true");
+    }
+    const res = await fetch(url.toString(), {
+      method: "POST",
+    });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Summary generation request failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function fetchClauseExplanation(
+  documentId: string,
+  clauseId: string
+): Promise<ApiResponse<ClauseExplanationData>> {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/documents/${documentId}/clauses/${clauseId}/explain`
+    );
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Clause explanation fetch failed: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function generateClauseExplanation(
+  documentId: string,
+  clauseId: string,
+  force = false
+): Promise<ApiResponse<ClauseExplanationData>> {
+  try {
+    const url = new URL(
+      `${API_BASE_URL}/documents/${documentId}/clauses/${clauseId}/explain`
+    );
+    if (force) {
+      url.searchParams.set("force_regenerate", "true");
+    }
+    const res = await fetch(url.toString(), {
+      method: "POST",
+    });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Clause explanation generation failed: ${message}`,
         retryable: true,
       },
     };

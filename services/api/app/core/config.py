@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "mock"
     LLM_API_KEY: Optional[str] = None
     LLM_MODEL: str = "gemini-1.5-flash"
+    # Phase 5 aliases for AI configuration
+    AI_PROVIDER: Optional[str] = None
+    AI_API_KEY: Optional[str] = None
+    AI_MODEL: Optional[str] = None
     # Generation parameters
     AI_TEMPERATURE: float = 0.1          # Low temperature → conservative, factual responses
     AI_MAX_OUTPUT_TOKENS: int = 4096     # Sufficient for structured legal summaries

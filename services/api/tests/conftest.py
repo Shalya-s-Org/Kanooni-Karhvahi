@@ -14,6 +14,11 @@ from app.services.document_service import document_service
 from app.document.storage import document_storage
 import app.api.routes.documents as routes_doc_module
 import app.models  # ensure models registered
+from app.core.config import settings
+
+# Force mock providers for testing environment
+settings.EMBEDDING_PROVIDER = "mock"
+settings.LLM_PROVIDER = "mock"
 
 
 @pytest_asyncio.fixture(scope="session")

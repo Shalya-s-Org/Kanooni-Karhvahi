@@ -164,3 +164,82 @@ export type DocumentProcessingStatus =
   | "DELETING"
   | "DELETED";
 
+// ─── Phase 5: AI Comprehension & Analysis ───────────────────────────────────
+
+export type CheckSignalSeverity = "INFO" | "ATTENTION" | "HIGH_ATTENTION";
+
+export interface CheckSignal {
+  category: string;
+  message: string;
+  severity: CheckSignalSeverity;
+  evidence_refs: string[];
+  explanation?: string;
+}
+
+export interface KeyPoint {
+  text: string;
+  evidence_refs: string[];
+}
+
+export interface ImportantTerm {
+  term: string;
+  explanation: string;
+}
+
+export type AnalysisLifecycleStatus =
+  | "PENDING"
+  | "GENERATING"
+  | "COMPLETED"
+  | "VALIDATION_FAILED"
+  | "FAILED"
+  | "PROVIDER_UNAVAILABLE";
+
+export interface DocumentSummaryData {
+  analysis_id: string;
+  document_id: string;
+  status: AnalysisLifecycleStatus | string;
+  summary?: string | null;
+  purpose?: string | null;
+  document_type?: string | null;
+  key_points: KeyPoint[];
+  important_dates: string[];
+  important_amounts: string[];
+  important_parties: string[];
+  obligations: string[];
+  check_signals: CheckSignal[];
+  uncertainty_notes: string[];
+  evidence_refs: string[];
+  provider?: string | null;
+  model?: string | null;
+  prompt_version?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ClauseExplanationData {
+  analysis_id: string;
+  document_id: string;
+  clause_id: string;
+  status: AnalysisLifecycleStatus | string;
+  original_text?: string | null;
+  clause_number?: string | null;
+  clause_title?: string | null;
+  page_start?: number | null;
+  plain_meaning?: string | null;
+  why_it_matters?: string | null;
+  important_terms: ImportantTerm[];
+  obligations: string[];
+  dates: string[];
+  amounts: string[];
+  check_signals: CheckSignal[];
+  uncertainty_notes: string[];
+  evidence_refs: string[];
+  provider?: string | null;
+  model?: string | null;
+  prompt_version?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+

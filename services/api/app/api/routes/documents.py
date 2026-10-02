@@ -643,3 +643,97 @@ async def retrieve_document_chunks(
             message="An unexpected error occurred during retrieval.",
             retryable=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: AI Document Summary & Clause Explanation Endpoints
+# ---------------------------------------------------------------------------
+
+from app.schemas.analysis import DocumentSummaryResponseData, ClauseExplanationResponseData
+from app.api.routes.analysis import (
+    generate_document_summary as _gen_doc_summary,
+    get_document_summary as _get_doc_summary,
+    generate_clause_explanation as _gen_clause_explanation,
+    get_clause_explanation as _get_clause_explanation,
+)
+
+
+@router.post(
+    "/{document_id}/summary",
+    response_model=ApiResponse[DocumentSummaryResponseData],
+    summary="Generate AI Document Summary (Phase 5)",
+    description=(
+        "Generates an AI-powered plain-language summary of the document. "
+        "Every claim is traced to source evidence (page, clause, chunk). "
+        "This is not legal advice."
+    ),
+)
+async def generate_document_summary_on_document(
+    document_id: uuid.UUID,
+    response: Response,
+    force_regenerate: bool = False,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[DocumentSummaryResponseData]:
+    return await _gen_doc_summary(
+        document_id=document_id,
+        response=response,
+        force_regenerate=force_regenerate,
+        db=db,
+    )
+
+
+@router.get(
+    "/{document_id}/summary",
+    response_model=ApiResponse[DocumentSummaryResponseData],
+    summary="Retrieve AI Document Summary",
+    description="Returns an existing AI document summary if one has been generated.",
+)
+async def get_document_summary_on_document(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[DocumentSummaryResponseData]:
+    return await _get_doc_summary(document_id=document_id, db=db)
+
+
+@router.post(
+    "/{document_id}/clauses/{clause_id}/explain",
+    response_model=ApiResponse[ClauseExplanationResponseData],
+    summary="Generate AI Clause Explanation (Phase 5)",
+    description=(
+        "Generates a plain-language AI explanation of a specific clause. "
+        "The original clause text is always preserved alongside the explanation. "
+        "This is not legal advice."
+    ),
+)
+async def generate_clause_explanation_on_document(
+    document_id: uuid.UUID,
+    clause_id: uuid.UUID,
+    response: Response,
+    force_regenerate: bool = False,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[ClauseExplanationResponseData]:
+    return await _gen_clause_explanation(
+        document_id=document_id,
+        clause_id=clause_id,
+        response=response,
+        force_regenerate=force_regenerate,
+        db=db,
+    )
+
+
+@router.get(
+    "/{document_id}/clauses/{clause_id}/explain",
+    response_model=ApiResponse[ClauseExplanationResponseData],
+    summary="Retrieve AI Clause Explanation",
+    description="Returns an existing clause explanation if one has been generated.",
+)
+async def get_clause_explanation_on_document(
+    document_id: uuid.UUID,
+    clause_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[ClauseExplanationResponseData]:
+    return await _get_clause_explanation(
+        document_id=document_id,
+        clause_id=clause_id,
+        db=db,
+    )

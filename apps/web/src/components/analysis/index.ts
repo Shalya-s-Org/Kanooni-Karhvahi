@@ -1,4 +1,4 @@
-/**
- * Document analysis summary & risk indicators components (Phase 3+).
- */
-export {};
+export { SafetyDisclaimer } from "./SafetyDisclaimer";
+export { EvidenceReference } from "./EvidenceReference";
+export { DocumentSummaryPanel } from "./DocumentSummaryPanel";
+export { ClauseExplanationCard } from "./ClauseExplanationCard";
