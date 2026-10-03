@@ -92,14 +92,3 @@ npm run build
 
 ---
 
-## Phase 1 Milestones (Completed Foundation)
-- [x] Standard monorepo directory layout
-- [x] Modular React + TypeScript Vite frontend shell
-- [x] Layered FastAPI architecture (routes -> services -> repositories -> models)
-- [x] Standardized API JSON envelope (`ApiResponse[T]`, `ApiError`)
-- [x] Abstract AI, Embedding, OCR, and Storage provider interfaces
-- [x] PostgreSQL + pgvector and Redis health connectivity checks
-- [x] Alembic migration foundation
-- [x] Celery worker initialization and task stubs
-- [x] Comprehensive architecture, database, prompt, and API documentation
-- [x] Automated backend tests
