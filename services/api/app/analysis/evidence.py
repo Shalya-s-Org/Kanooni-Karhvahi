@@ -69,23 +69,26 @@ class EvidenceItem:
     ``evidence_id`` is the stable reference that the LLM puts in
     ``evidence_refs`` fields and the hallucination guard validates.
     """
-    evidence_id: str          # Stable identifier (UUID-based)
-    source_type: str          # "clause" | "entity" | "chunk" | "classification" | "page"
-    document_id: uuid.UUID
+    evidence_id: str          # Stable identifier (UUID-based or citation-based)
+    source_type: str          # "clause" | "entity" | "chunk" | "classification" | "page" | "legal_source_chunk"
+    document_id: Optional[uuid.UUID]
     page_number: int
-    source_text: str          # Verbatim text from the document
+    source_text: str          # Verbatim text from document or legal source
+    source_category: str = "uploaded_document"  # "uploaded_document" | "verified_legal_source"
     # Optional enrichment
     page_id: Optional[uuid.UUID] = None
     clause_id: Optional[uuid.UUID] = None
     chunk_id: Optional[uuid.UUID] = None
     clause_number: Optional[str] = None
     retrieval_score: Optional[float] = None
+    citation: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "evidence_id": self.evidence_id,
+            "source_category": self.source_category,
             "source_type": self.source_type,
-            "document_id": str(self.document_id),
+            "document_id": str(self.document_id) if self.document_id else None,
             "page_number": self.page_number,
             "source_text": self.source_text,
             "page_id": str(self.page_id) if self.page_id else None,
@@ -93,6 +96,7 @@ class EvidenceItem:
             "chunk_id": str(self.chunk_id) if self.chunk_id else None,
             "clause_number": self.clause_number,
             "retrieval_score": self.retrieval_score,
+            "citation": self.citation,
         }
 
 
@@ -419,6 +423,34 @@ class EvidencePackBuilder:
             document_type=doc_type,
             total_pages=clause.page_end,
         )
+
+    def attach_legal_context(
+        self,
+        pack: EvidencePack,
+        legal_results: List[Any],
+    ) -> None:
+        """
+        Enrich an evidence pack with verified legal sources.
+        Strictly categorises them as external legal source evidence so the LLM
+        and guard clearly distinguish uploaded-document facts from external context.
+        """
+        for item in legal_results:
+            cit = item.citation
+            cit_dict = cit.model_dump() if hasattr(cit, "model_dump") else (cit if isinstance(cit, dict) else {})
+            citation_id = cit_dict.get("citation_id") if isinstance(cit_dict, dict) else getattr(cit, "citation_id", str(uuid.uuid4()))
+
+            ev_item = EvidenceItem(
+                evidence_id=citation_id,
+                source_category="verified_legal_source",
+                source_type="legal_source_chunk",
+                document_id=pack.document_id,
+                page_number=1,
+                source_text=item.source_text,
+                retrieval_score=item.score,
+                citation=cit_dict,
+            )
+            pack.items.append(ev_item)
+            pack.valid_ids.add(citation_id)
 
 
 # Module-level singleton.

@@ -137,6 +137,14 @@ class DocumentSummaryOutput(BaseModel):
         default_factory=list,
         description="IDs of all EvidenceItems supporting the summary.",
     )
+    legal_citations: List[Any] = Field(
+        default_factory=list,
+        description="Structured citations for verified legal sources referenced.",
+    )
+    external_legal_context: List[str] = Field(
+        default_factory=list,
+        description="Contextual legal observations grounded in verified sources (not legal advice).",
+    )
     # Provenance metadata — set by the analysis service, not the LLM.
     provider: str = Field(default="unknown")
     model: str = Field(default="unknown")
@@ -198,6 +206,14 @@ class ClauseExplanationOutput(BaseModel):
     evidence_refs: List[str] = Field(
         default_factory=list,
         description="Evidence IDs used to generate this explanation.",
+    )
+    legal_citations: List[Any] = Field(
+        default_factory=list,
+        description="Structured citations for verified legal sources referenced.",
+    )
+    external_legal_context: List[str] = Field(
+        default_factory=list,
+        description="Contextual legal observations grounded in verified sources (not legal advice).",
     )
     provider: str = Field(default="unknown")
     model: str = Field(default="unknown")

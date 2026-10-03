@@ -12,6 +12,11 @@ import {
   RetrievalResponseData,
   DocumentSummaryData,
   ClauseExplanationData,
+  LegalSource,
+  LegalSourceRetrieveResponse,
+  // Phase 7
+  SupportedLanguagesResponse,
+  TranslationData,
 } from "../types";
 
 
@@ -394,6 +399,148 @@ export async function generateClauseExplanation(
         message: `Clause explanation generation failed: ${message}`,
         retryable: true,
       },
+    };
+  }
+}
+
+export async function fetchLegalSources(params?: {
+  jurisdiction?: string;
+  source_type?: string;
+}): Promise<ApiResponse<LegalSource[]>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/legal-sources`);
+    if (params?.jurisdiction) url.searchParams.set("jurisdiction", params.jurisdiction);
+    if (params?.source_type) url.searchParams.set("source_type", params.source_type);
+
+    const res = await fetch(url.toString());
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Failed to fetch legal sources: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+export async function retrieveLegalSources(
+  query: string,
+  options?: {
+    jurisdiction?: string;
+    source_types?: string[];
+    effective_date?: string;
+    top_k?: number;
+  }
+): Promise<ApiResponse<LegalSourceRetrieveResponse>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/legal-sources/retrieve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        jurisdiction: options?.jurisdiction,
+        source_types: options?.source_types,
+        effective_date: options?.effective_date,
+        top_k: options?.top_k || 5,
+      }),
+    });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: `Failed to retrieve legal sources: ${message}`,
+        retryable: true,
+      },
+    };
+  }
+}
+
+// ─── Phase 7: Multilingual Translation ──────────────────────────────────────
+
+export async function fetchSupportedLanguages(): Promise<ApiResponse<SupportedLanguagesResponse>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/translate/languages`);
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: { code: "NETWORK_ERROR", message: `Could not fetch languages: ${message}`, retryable: true },
+    };
+  }
+}
+
+export async function translateText(
+  text: string,
+  targetLanguage: string,
+  contentType: string = "snippet"
+): Promise<ApiResponse<TranslationData>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/translate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, target_language: targetLanguage, content_type: contentType }),
+    });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: { code: "NETWORK_ERROR", message: `Translation failed: ${message}`, retryable: true },
+    };
+  }
+}
+
+export async function translateDocumentSummary(
+  documentId: string,
+  targetLanguage: string,
+  force = false
+): Promise<ApiResponse<TranslationData>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/documents/${documentId}/translate/summary`);
+    url.searchParams.set("target_language", targetLanguage);
+    if (force) url.searchParams.set("force", "true");
+    const res = await fetch(url.toString(), { method: "POST" });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: { code: "NETWORK_ERROR", message: `Summary translation failed: ${message}`, retryable: true },
+    };
+  }
+}
+
+export async function translateClauseExplanation(
+  documentId: string,
+  clauseId: string,
+  targetLanguage: string,
+  force = false
+): Promise<ApiResponse<TranslationData>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/documents/${documentId}/clauses/${clauseId}/translate`);
+    url.searchParams.set("target_language", targetLanguage);
+    if (force) url.searchParams.set("force", "true");
+    const res = await fetch(url.toString(), { method: "POST" });
+    return await res.json();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return {
+      success: false,
+      data: null,
+      error: { code: "NETWORK_ERROR", message: `Clause translation failed: ${message}`, retryable: true },
     };
   }
 }

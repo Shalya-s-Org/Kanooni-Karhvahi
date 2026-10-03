@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-PROMPT_VERSION = "phase5-v1"
+PROMPT_VERSION = "phase6-v1"
 
 # ---------------------------------------------------------------------------
 # Shared system instruction
@@ -71,7 +71,16 @@ CRITICAL RULES — YOU MUST FOLLOW THESE WITHOUT EXCEPTION:
 7. OUTPUT FORMAT: Respond with ONLY valid JSON conforming to the provided
    schema. No prose, no markdown fences, no explanations outside the JSON.
 
-8. PRIVACY: Do not repeat or log API keys, credentials, or system internals."""
+8. PRIVACY: Do not repeat or log API keys, credentials, or system internals.
+
+9. VERIFIED LEGAL SOURCES & CITATIONS:
+   When external legal sources (statutes, rules, judgments) are provided in the
+   evidence pack, they serve as GENERAL CONTEXTUAL INFORMATION ONLY.
+   - The uploaded document is always the PRIMARY source for what the document says.
+   - External legal sources MUST NEVER be presented as definitive predictions,
+     guaranteed outcomes, or a replacement for an advocate.
+   - Every claim relying on an external legal source MUST cite its citation_id.
+   - If a statutory section's application is uncertain, explicitly disclose the uncertainty."""
 
 
 # ---------------------------------------------------------------------------
@@ -205,26 +214,63 @@ Requirements:
 # ---------------------------------------------------------------------------
 
 def _format_evidence_block(evidence_items: List[Dict[str, Any]]) -> str:
-    """Format evidence items into a numbered, readable block for the prompt."""
+    """
+    Format evidence items into clean, readable blocks.
+    Strictly separates Uploaded Document Evidence from External Legal Source Evidence.
+    """
     if not evidence_items:
         return "(No evidence items available)"
 
-    lines: List[str] = []
-    for item in evidence_items:
-        eid = item.get("evidence_id", "unknown")
-        source = item.get("source_type", "document")
-        page = item.get("page_number", "?")
-        clause_num = item.get("clause_number", "")
-        text = item.get("source_text", "").strip()
+    doc_lines: List[str] = []
+    legal_lines: List[str] = []
 
-        header = f"[{eid}] Source: {source} | Page: {page}"
-        if clause_num:
-            header += f" | Clause: {clause_num}"
-        lines.append(header)
-        # Truncate very long evidence snippets to keep prompt manageable.
+    for item in evidence_items:
+        category = item.get("source_category", "uploaded_document")
+        eid = item.get("evidence_id", "unknown")
+        text = item.get("source_text", "").strip()
         if len(text) > 800:
             text = text[:800] + "... [truncated]"
-        lines.append(f"  Text: {text}")
-        lines.append("")
 
-    return "\n".join(lines)
+        if category == "verified_legal_source":
+            cit = item.get("citation") or {}
+            source_name = cit.get("source_name", "Official Legal Source")
+            sec = cit.get("section") or ""
+            authority = cit.get("authority", "")
+            ver = cit.get("version", "")
+            url = cit.get("official_url", "")
+
+            header = f"[{eid}] Source: {source_name} (verified_legal_source)"
+            if sec:
+                header += f" | {sec}"
+            if authority:
+                header += f" | Authority: {authority}"
+            if ver:
+                header += f" | Version: {ver}"
+            if url:
+                header += f" | Official URL: {url}"
+
+            legal_lines.append(header)
+            legal_lines.append(f"  Text: {text}")
+            legal_lines.append("")
+        else:
+            source = item.get("source_type", "document")
+            page = item.get("page_number", "?")
+            clause_num = item.get("clause_number", "")
+            header = f"[{eid}] Source: {source} (uploaded_document) | Page: {page}"
+            if clause_num:
+                header += f" | Clause: {clause_num}"
+
+            doc_lines.append(header)
+            doc_lines.append(f"  Text: {text}")
+            doc_lines.append("")
+
+    sections: List[str] = []
+    if doc_lines:
+        sections.append("--- PRIMARY EVIDENCE: UPLOADED DOCUMENT ---")
+        sections.extend(doc_lines)
+    if legal_lines:
+        sections.append("--- CONTEXTUAL EVIDENCE: VERIFIED LEGAL SOURCES ---")
+        sections.append("(External statutory reference only. Not legal advice.)")
+        sections.extend(legal_lines)
+
+    return "\n".join(sections) if sections else "(No evidence items available)"

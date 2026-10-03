@@ -1,4 +1,6 @@
 /**
- * Statutory citation and source reference components (Phase 4+).
+ * Statutory citation and verified legal source reference components (Phase 6).
  */
-export {};
+
+export * from "./LegalCitationBadge";
+export * from "./VerifiedLegalSourcePanel";

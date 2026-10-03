@@ -13,6 +13,12 @@ from app.models.analysis import (
     AnalysisStatus,
     AnalysisType,
 )
+from app.models.legal_source import (
+    LegalSource,
+    LegalSourceVersion,
+    LegalSourceChunk,
+    LegalSourceType,
+)
 
 __all__ = [
     "Base",
@@ -26,4 +32,8 @@ __all__ = [
     "ClauseAnalysis",
     "AnalysisStatus",
     "AnalysisType",
+    "LegalSource",
+    "LegalSourceVersion",
+    "LegalSourceChunk",
+    "LegalSourceType",
 ]

@@ -409,12 +409,22 @@ class DocumentService:
 
         except Exception as e:
             logger.error("Error processing document %s: %s", document_id, e, exc_info=True)
-            doc.status = "FAILED"
-            doc.error_code = "PROCESSING_ERROR"
-            doc.error_message = str(e)
-            doc.is_retryable = True
-            doc.updated_at = datetime.now(timezone.utc)
-            await db.commit()
+            try:
+                await db.rollback()
+            except Exception:
+                pass  # Best-effort rollback; connection may already be dead
+            try:
+                doc.status = "FAILED"
+                doc.error_code = "PROCESSING_ERROR"
+                doc.error_message = str(e)
+                doc.is_retryable = True
+                doc.updated_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception as commit_err:
+                logger.error(
+                    "Failed to persist FAILED status for document %s: %s",
+                    document_id, commit_err
+                )
             return doc
 
     async def delete_document(self, document_id: uuid.UUID, db: AsyncSession) -> bool:

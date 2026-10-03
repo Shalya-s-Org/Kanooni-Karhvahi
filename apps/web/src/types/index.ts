@@ -209,6 +209,8 @@ export interface DocumentSummaryData {
   check_signals: CheckSignal[];
   uncertainty_notes: string[];
   evidence_refs: string[];
+  legal_citations?: LegalCitation[] | null;
+  external_legal_context?: string[] | null;
   provider?: string | null;
   model?: string | null;
   prompt_version?: string | null;
@@ -235,6 +237,8 @@ export interface ClauseExplanationData {
   check_signals: CheckSignal[];
   uncertainty_notes: string[];
   evidence_refs: string[];
+  legal_citations?: LegalCitation[] | null;
+  external_legal_context?: string[] | null;
   provider?: string | null;
   model?: string | null;
   prompt_version?: string | null;
@@ -243,3 +247,108 @@ export interface ClauseExplanationData {
   updated_at?: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 6: Verified Legal Source Types
+// ---------------------------------------------------------------------------
+
+export interface LegalCitation {
+  citation_id: string;
+  source_name: string;
+  authority: string;
+  source_type: string;
+  section?: string | null;
+  subsection?: string | null;
+  version: string;
+  effective_date?: string | null;
+  official_url: string;
+  retrieved_at: string;
+}
+
+export interface LegalSourceVersion {
+  id: string;
+  legal_source_id: string;
+  version_identifier: string;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  publication_date?: string | null;
+  retrieved_at: string;
+  content_hash: string;
+  source_url: string;
+  status: string;
+  created_at: string;
+}
+
+export interface LegalSource {
+  id: string;
+  name: string;
+  source_type: string;
+  authority: string;
+  official_url: string;
+  description?: string | null;
+  jurisdiction: string;
+  language: string;
+  active: boolean;
+  trust_level: string;
+  created_at: string;
+  updated_at: string;
+  versions?: LegalSourceVersion[];
+}
+
+export interface LegalRetrievalResult {
+  chunk_id: string;
+  legal_source_id: string;
+  legal_source_name: string;
+  authority: string;
+  source_type: string;
+  official_url: string;
+  version_id: string;
+  version_identifier: string;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  section?: string | null;
+  subsection?: string | null;
+  page_or_reference?: string | null;
+  source_text: string;
+  score: number;
+  retrieval_method: string;
+  citation: LegalCitation;
+}
+
+export interface LegalSourceRetrieveResponse {
+  query: string;
+  results: LegalRetrievalResult[];
+  citations: LegalCitation[];
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 7: Multilingual Translation Types
+// ---------------------------------------------------------------------------
+
+export interface SupportedLanguageItem {
+  code: string;
+  name: string;
+}
+
+export interface SupportedLanguagesResponse {
+  languages: SupportedLanguageItem[];
+  preserve_terms_note: string;
+}
+
+export interface TranslationData {
+  translation_id: string;
+  document_id?: string | null;
+  source_language: string;
+  target_language: string;
+  target_language_name: string;
+  content_type: string;
+  clause_id?: string | null;
+  original_text: string;
+  translated_text: string;
+  preserved_terms: string[];
+  provider: string;
+  model: string;
+  created_at: string;
+  status: "COMPLETED" | "FAILED";
+  error_message?: string | null;
+}

@@ -3,10 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchDocumentSummary,
   generateDocumentSummary,
+  fetchSupportedLanguages,
+  translateText,
 } from "../../services/api";
 import { SafetyDisclaimer } from "./SafetyDisclaimer";
 import { EvidenceReference } from "./EvidenceReference";
-import { CheckSignal, KeyPoint } from "../../types";
+import { LanguageSelector } from "../common/LanguageSelector";
+import { TranslatedTextPanel } from "../common/TranslatedTextPanel";
+import { CheckSignal, KeyPoint, TranslationData } from "../../types";
 import {
   Sparkles,
   Loader2,
@@ -37,6 +41,11 @@ export const DocumentSummaryPanel: React.FC<DocumentSummaryPanelProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [generateError, setGenerateError] = useState<string | null>(null);
+  // Phase 7: Translation state
+  const [selectedLang, setSelectedLang] = useState<string | null>(null);
+  const [translationResult, setTranslationResult] = useState<TranslationData | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
 
   const {
     data: summaryResponse,
@@ -169,6 +178,59 @@ export const DocumentSummaryPanel: React.FC<DocumentSummaryPanelProps> = ({
               <RefreshCw className="w-3 h-3" /> Regenerate
             </button>
           </div>
+
+          {/* Phase 7: Language Selector for Summary Translation */}
+          <LanguageSelectorWithFetch
+            selectedLang={selectedLang}
+            onSelect={async (code) => {
+              if (!code) {
+                setSelectedLang(null);
+                setTranslationResult(null);
+                setTranslationError(null);
+                return;
+              }
+              setSelectedLang(code);
+              setIsTranslating(true);
+              setTranslationError(null);
+              const textToTranslate = [
+                summaryData.purpose,
+                summaryData.summary,
+              ].filter(Boolean).join("\n\n");
+              const res = await translateText(textToTranslate, code, "summary");
+              setIsTranslating(false);
+              if (res.success && res.data) {
+                setTranslationResult(res.data);
+              } else {
+                setTranslationError(res.error?.message || "Translation failed.");
+              }
+            }}
+          />
+
+          {/* Translation result panel */}
+          {selectedLang && (
+            <TranslatedTextPanel
+              translationData={translationResult}
+              isLoading={isTranslating}
+              error={translationError}
+              targetLanguageName={translationResult?.target_language_name || selectedLang}
+              onRetry={async () => {
+                if (!selectedLang || !summaryData) return;
+                setIsTranslating(true);
+                setTranslationError(null);
+                const textToTranslate = [
+                  summaryData.purpose,
+                  summaryData.summary,
+                ].filter(Boolean).join("\n\n");
+                const res = await translateText(textToTranslate, selectedLang, "summary");
+                setIsTranslating(false);
+                if (res.success && res.data) {
+                  setTranslationResult(res.data);
+                } else {
+                  setTranslationError(res.error?.message || "Translation failed.");
+                }
+              }}
+            />
+          )}
 
           {/* Purpose & Overview */}
           <div className="p-4 rounded-lg bg-white border border-slate-200 space-y-3 shadow-xs">
@@ -386,3 +448,39 @@ export const DocumentSummaryPanel: React.FC<DocumentSummaryPanelProps> = ({
     </div>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Phase 7: Language selector with language list fetched from the API
+// ---------------------------------------------------------------------------
+
+function LanguageSelectorWithFetch({
+  selectedLang,
+  onSelect,
+}: {
+  selectedLang: string | null;
+  onSelect: (code: string) => void;
+}) {
+  const { data: langResponse, isLoading } = useQuery({
+    queryKey: ["supported-languages"],
+    queryFn: () => fetchSupportedLanguages(),
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+  });
+
+  const languages = langResponse?.data?.languages ?? [];
+
+  return (
+    <div className="p-3 rounded-lg bg-violet-50/50 border border-violet-200">
+      <LanguageSelector
+        languages={languages}
+        selectedLanguage={selectedLang}
+        onSelect={onSelect}
+        isLoading={isLoading}
+      />
+      {selectedLang && (
+        <p className="mt-2 text-[10px] text-violet-600">
+          Legal terms like Section numbers, IPC, CrPC, and Act names are preserved in English.
+        </p>
+      )}
+    </div>
+  );
+}
